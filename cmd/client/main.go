@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/pubsub"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,26 +23,42 @@ func main() {
 
 	fmt.Println("Connected Peril client!")
 
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("error creating a new channel on the connection: %v", err)
+	}
+
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatalf("error getting username: %v", err)
 	}
 
-	fmt.Println("declaring and bindin! queue...")
-	_, _, err = pubsub.DeclareAndBind(
+	gs := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("%s.%s", routing.PauseKey, username),
 		routing.PauseKey,
 		pubsub.TransientQueue,
+		handlerPause(gs),
 	)
 	if err != nil {
-		log.Fatalf("error declaring and binding the queue in client: %v", err)
+		log.Fatalf("error subscribing to pause: %v", err)
 	}
 
-	gamestate := gamelogic.NewGameState(username)
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
+		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		pubsub.TransientQueue,
+		handlerMove(gs),
+	)
+	if err != nil {
+		log.Fatalf("error subscribing to move: %v", err)
+	}
 
-	gamelogic.PrintClientHelp()
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -51,17 +67,31 @@ func main() {
 
 		switch words[0] {
 		case "spawn":
-			err := gamestate.CommandSpawn(words)
+			err := gs.CommandSpawn(words)
 			if err != nil {
 				log.Printf("error processing spawn command: %v", err)
 			}
 		case "move":
-			_, err := gamestate.CommandMove(words)
+			move, err := gs.CommandMove(words)
 			if err != nil {
 				log.Printf("error processing move command: %v", err)
+				continue
 			}
+
+			err = pubsub.PublishJSON(
+				ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
+				move,
+			)
+			if err != nil {
+				log.Printf("error publishing move message: %v", err)
+				continue
+			}
+
+			log.Println("move message published successfully!")
 		case "status":
-			gamestate.CommandStatus()
+			gs.CommandStatus()
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":

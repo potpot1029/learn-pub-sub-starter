@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/pubsub"
+	"github.com/potpot1029/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
