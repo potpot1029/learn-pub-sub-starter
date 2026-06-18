@@ -36,6 +36,14 @@ func main() {
 		pubsub.DurableQueue,
 	)
 
+	_, _, err = pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
+		pubsub.DurableQueue,
+	)
+
 	gamelogic.PrintServerHelp()
 	for {
 		words := gamelogic.GetInput()

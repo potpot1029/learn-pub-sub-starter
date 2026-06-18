@@ -3,6 +3,7 @@ package pubsub
 import (
 	"fmt"
 
+	"github.com/potpot1029/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -33,7 +34,9 @@ func DeclareAndBind(
 	}
 	noWait := false
 
-	queue, err := ch.QueueDeclare(queueName, durable, autoDelete, exclusive, noWait, nil)
+	queue, err := ch.QueueDeclare(queueName, durable, autoDelete, exclusive, noWait, amqp.Table{
+		"x-dead-letter-exchange": routing.ExchangePerilDead,
+	})
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("[DeclareAndBind] error creating a queue: %v", err)
 	}

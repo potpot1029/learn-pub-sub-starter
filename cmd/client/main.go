@@ -53,10 +53,22 @@ func main() {
 		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
 		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
 		pubsub.TransientQueue,
-		handlerMove(gs),
+		handlerMove(gs, ch),
 	)
 	if err != nil {
 		log.Fatalf("error subscribing to move: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
+		pubsub.DurableQueue,
+		handlerWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("error subscribing to war: %v", err)
 	}
 
 	for {

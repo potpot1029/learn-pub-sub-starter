@@ -7,13 +7,21 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type Acktype string
+
+const (
+	Ack         Acktype = "ack"
+	NackRequeue Acktype = "nack_requeue"
+	NackDiscard Acktype = "nack_discard"
+)
+
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T),
+	handler func(T) Acktype,
 ) error {
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -34,11 +42,27 @@ func SubscribeJSON[T any](
 				return
 			}
 
-			handler(body)
+			acktype := handler(body)
 
-			if err = msg.Ack(false); err != nil {
-				fmt.Printf("[SubscribeJSON] error acknowledging message: %v", err)
-				return
+			switch acktype {
+			case Ack:
+				fmt.Println("acknowledging message...")
+				if err = msg.Ack(false); err != nil {
+					fmt.Printf("[SubscribeJSON] error acknowledging message: %v", err)
+					return
+				}
+			case NackRequeue:
+				fmt.Println("nack and requeuing message...")
+				if err = msg.Nack(false, true); err != nil {
+					fmt.Printf("[SubscribeJSON] error nack and requeuing message: %v", err)
+					return
+				}
+			case NackDiscard:
+				fmt.Println("nack and discarding message...")
+				if err = msg.Nack(false, false); err != nil {
+					fmt.Printf("[SubscribeJSON] error nack and discarding message: %v", err)
+					return
+				}
 			}
 		}
 
