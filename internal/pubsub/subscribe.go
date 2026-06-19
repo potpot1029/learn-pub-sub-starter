@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -15,30 +17,31 @@ const (
 	NackDiscard Acktype = "nack_discard"
 )
 
-func SubscribeJSON[T any](
+func subscribe[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
-	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	simpleQueueType SimpleQueueType,
 	handler func(T) Acktype,
+	unmarshaller func([]byte) (T, error),
 ) error {
-	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
-		return fmt.Errorf("[SubscribeJSON] error declaring and binding queue to exchange: %v", err)
+		return fmt.Errorf("[subscribe] error declaring and binding queue to exchange: %v", err)
 	}
 
 	deliverCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
-		return fmt.Errorf("[SubscribeJSON] error consuming queued messages: %v", err)
+		return fmt.Errorf("[subscribe] error consuming queued messages: %v", err)
 	}
 
 	go func() {
 		for msg := range deliverCh {
 
-			var body T
-			if err = json.Unmarshal(msg.Body, &body); err != nil {
-				fmt.Printf("[SubscribeJSON] error unmarhsaling message body: %v", err)
+			body, err := unmarshaller(msg.Body)
+			if err != nil {
+				fmt.Printf("[subscribe] error unmarhsaling message body: %v", err)
 				return
 			}
 
@@ -48,19 +51,19 @@ func SubscribeJSON[T any](
 			case Ack:
 				fmt.Println("acknowledging message...")
 				if err = msg.Ack(false); err != nil {
-					fmt.Printf("[SubscribeJSON] error acknowledging message: %v", err)
+					fmt.Printf("[subscribe] error acknowledging message: %v", err)
 					return
 				}
 			case NackRequeue:
 				fmt.Println("nack and requeuing message...")
 				if err = msg.Nack(false, true); err != nil {
-					fmt.Printf("[SubscribeJSON] error nack and requeuing message: %v", err)
+					fmt.Printf("[subscribe] error nack and requeuing message: %v", err)
 					return
 				}
 			case NackDiscard:
 				fmt.Println("nack and discarding message...")
 				if err = msg.Nack(false, false); err != nil {
-					fmt.Printf("[SubscribeJSON] error nack and discarding message: %v", err)
+					fmt.Printf("[subscribe] error nack and discarding message: %v", err)
 					return
 				}
 			}
@@ -69,4 +72,62 @@ func SubscribeJSON[T any](
 	}()
 
 	return nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) Acktype,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			var val T
+			decoder := json.NewDecoder(bytes.NewBuffer(data))
+
+			err := decoder.Decode(&val)
+			if err != nil {
+				return val, err
+			}
+
+			return val, nil
+		},
+	)
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) Acktype,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			var val T
+			decoder := gob.NewDecoder(bytes.NewBuffer(data))
+
+			err := decoder.Decode(&val)
+			if err != nil {
+				return val, err
+			}
+
+			return val, nil
+		},
+	)
 }

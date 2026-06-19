@@ -65,7 +65,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
 		pubsub.DurableQueue,
-		handlerWar(gs),
+		handlerWar(gs, ch),
 	)
 	if err != nil {
 		log.Fatalf("error subscribing to war: %v", err)

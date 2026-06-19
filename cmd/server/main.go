@@ -28,12 +28,13 @@ func main() {
 		log.Fatalf("error creating a new channel on the connection: %v", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		fmt.Sprintf("%s.*", routing.GameLogSlug),
 		pubsub.DurableQueue,
+		handlerLog(),
 	)
 
 	_, _, err = pubsub.DeclareAndBind(
