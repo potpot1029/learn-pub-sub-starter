@@ -52,20 +52,6 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 	}
 }
 
-func publishGameLog(ch *amqp.Channel, gl routing.GameLog) error {
-	err := pubsub.PublishGob(
-		ch,
-		routing.ExchangePerilTopic,
-		fmt.Sprintf("%s.%s", routing.GameLogSlug, gl.Username),
-		gl,
-	)
-	if err != nil {
-		return fmt.Errorf("[PublishGameLog] err publishing GameLog: %v", err)
-	}
-
-	return nil
-}
-
 func handlerWar(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
 	return func(row gamelogic.RecognitionOfWar) pubsub.Acktype {
 		defer fmt.Print("> ")
@@ -93,7 +79,7 @@ func handlerWar(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.Recogn
 			Message:     msg,
 			Username:    gs.Player.Username,
 		}
-		err := publishGameLog(ch, gl)
+		err := gamelogic.PublishGameLog(ch, gl)
 		if err != nil {
 			return pubsub.NackRequeue
 		}

@@ -31,6 +31,11 @@ func subscribe[T any](
 		return fmt.Errorf("[subscribe] error declaring and binding queue to exchange: %v", err)
 	}
 
+	err = ch.Qos(10, 0, true)
+	if err != nil {
+		return fmt.Errorf("[subscribe] error prefetching messages: %v", err)
+	}
+
 	deliverCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("[subscribe] error consuming queued messages: %v", err)

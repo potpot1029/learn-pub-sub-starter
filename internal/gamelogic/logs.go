@@ -6,7 +6,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/potpot1029/learn-pub-sub-starter/internal/pubsub"
 	"github.com/potpot1029/learn-pub-sub-starter/internal/routing"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const logsFile = "game.log"
@@ -28,5 +30,19 @@ func WriteLog(gamelog routing.GameLog) error {
 	if err != nil {
 		return fmt.Errorf("could not write to logs file: %v", err)
 	}
+	return nil
+}
+
+func PublishGameLog(ch *amqp.Channel, gl routing.GameLog) error {
+	err := pubsub.PublishGob(
+		ch,
+		routing.ExchangePerilTopic,
+		fmt.Sprintf("%s.%s", routing.GameLogSlug, gl.Username),
+		gl,
+	)
+	if err != nil {
+		return fmt.Errorf("[PublishGameLog] err publishing GameLog: %v", err)
+	}
+
 	return nil
 }
